@@ -1,26 +1,14 @@
 {
   "name": "pizza-node",
-  "version": "1.0.0",
-  "main": "index.js",
+  "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "nodemon index.js"
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:local": "wrangler d1 migrations apply pizza --local",
+    "db:remote": "wrangler d1 migrations apply pizza --remote"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/MysticalEnnio/Pizza2.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/MysticalEnnio/Pizza2/issues"
-  },
-  "homepage": "https://github.com/MysticalEnnio/Pizza2#readme",
-  "description": "",
-  "dependencies": {
-    "body-parser": "^1.19.2",
-    "cors": "^2.8.5",
-    "express": "^4.17.3",
-    "nodemon": "^2.0.15"
+  "devDependencies": {
+    "wrangler": "4.30.0"
   }
 }

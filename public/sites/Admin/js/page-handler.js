@@ -79,8 +79,8 @@ class page_handler {
         $("#content").css("justify-content", "flex-start");
       });
     }
-    $.get("https://myst-socket.glitch.me/session", (data) => {
-      sessionOpt = JSON.parse(data);
+    $.getJSON("/api/session", (data) => {
+      sessionOpt = data;
       if (sessionOpt) {
         pba.show();
         pageHandler.pageHistory = ["Home", "Session"];
@@ -95,6 +95,7 @@ class page_handler {
 let pageHandler = new page_handler({
   beforeLoad: (callback) => {
     $("#content").empty();
+    stopOrdersPolling();
     callback();
   },
   afterLoadStandard: (callback) => {

@@ -1,21 +1,31 @@
 let login = new page(
   "login",
   (callback) => {
-    //dont needs to be safe cause its just for no misunderstanding
+    // The Worker checks the key on every admin request now.
     $("#content")
       .append('<input type="password" id="adminPsw" style="display: none;">')
+      .append('<button id="loginBtn" style="display: none;">Login</button>')
       .append('<h1 id="pswHeading">Admin Passwort</h1>');
     callback();
   },
   () => {
-    $("#adminPsw").keypress((e) => {
-      if (e.which == 13) {
-        if ($("#adminPsw").val().toLowerCase() == "master") {
-          pageHandler.loadPage("Home");
+    function tryLogin() {
+      adminKey = $("#adminPsw").val();
+      apiRequest(
+        "GET",
+        "/api/orders",
+        undefined,
+        () => pageHandler.loadPage("Home"),
+        () => {
+          adminKey = "";
+          $("#adminPsw").val("");
         }
-        $("#adminPsw").val("");
-      }
+      );
+    }
+    $("#adminPsw").keypress((e) => {
+      if (e.which == 13) tryLogin();
     });
+    $("#loginBtn").click(tryLogin);
   }
 );
 
@@ -55,10 +65,11 @@ let home = new page(
       showOrders();
     });
     $("#EndSession").click(() => {
-      $.get("https://myst-socket.glitch.me/endSession");
-      sessionOpt = 0;
-      orders = [];
-      pageHandler.loadPage("Home");
+      apiRequest("DELETE", "/api/session", undefined, () => {
+        sessionOpt = 0;
+        orders = [];
+        pageHandler.loadPage("Home");
+      });
     });
   }
 );
@@ -66,11 +77,11 @@ let home = new page(
 let options = new page(
   "options",
   (callback) => {
-    $.getJSON("../../assets/json/options.json", (data) => {
-      console.log(data);
-      for (let i = 0; i < data.length; i++) {
-        $("#content").append(`<p style="display: none;">${data[i]}</p>`);
-      }
+    apiRequest("GET", "/api/menu", undefined, (data) => {
+      (data.options || []).forEach((name) => {
+        $("#content").append(`<p style="display: none;">${name}</p>`);
+      });
+      $("#content *").fadeIn();
     });
     $("#content").append('<a id="aNO">Add new Option</a>');
     $("#content").append('<a id="rO">Remove Option</a>');
@@ -102,9 +113,7 @@ let addOption = new page(
   () => {
     $("#oI").keypress((e) => {
       if (e.which == 13) {
-        $.getJSON("../../assets/json/options.json", (data) => {
-          data.push($("#oI").val());
-          writeToFile("assets/json/options.json", data);
+        addMenuItem("option", $("#oI").val(), () => {
           $("#oI").val("");
           pageHandler.loadPage("Options");
         });
@@ -116,22 +125,25 @@ let addOption = new page(
 let removeOption = new page(
   "removeOption",
   (callback) => {
-    $.getJSON("../../assets/json/options.json", (data) => {
-      for (let i = 0; i < data.length; i++) {
+    apiRequest("GET", "/api/menu", undefined, (data) => {
+      const options = data.options || [];
+      for (let i = 0; i < options.length; i++) {
         $("#content").append(
           `<p class="oTR ${i == 0 ? "tE" : ""}" style="display: none;">${
-            data[i]
+            options[i]
           }</p>`
         );
       }
+      $("#content *").fadeIn();
       setTimeout(() => {
+        $("#content *").fadeIn();
         callback();
       }, 250);
     });
   },
   () => {
     $("#content p").click((e) => {
-      removeElement(e.target.innerHTML, "assets/json/options.json");
+      removeElement(e.target.innerHTML, "option");
       e.target.remove();
     });
   }
@@ -140,10 +152,11 @@ let removeOption = new page(
 let ingredients = new page(
   "ingredients",
   (callback) => {
-    $.getJSON("../../assets/json/ingredients.json", (data) => {
-      for (let i = 0; i < data.length; i++) {
-        $("#content").append(`<p style="display: none;">${data[i]}</p>`);
-      }
+    apiRequest("GET", "/api/menu", undefined, (data) => {
+      (data.ingredients || []).forEach((name) => {
+        $("#content").append(`<p style="display: none;">${name}</p>`);
+      });
+      $("#content *").fadeIn();
     });
     $("#content").append('<a id="aNI">Add new Ingredient</a>');
     $("#content").append('<a id="rI">Remove Ingredient</a>');
@@ -175,9 +188,7 @@ let addIngredient = new page(
   () => {
     $("#oI").keypress((e) => {
       if (e.which == 13) {
-        $.getJSON("../../assets/json/ingredients.json", (data) => {
-          data.push($("#oI").val());
-          writeToFile("assets/json/ingredients.json", data);
+        addMenuItem("ingredient", $("#oI").val(), () => {
           $("#oI").val("");
           pageHandler.loadPage("Ingredients");
         });
@@ -189,22 +200,24 @@ let addIngredient = new page(
 let removeIngredient = new page(
   "removeIngredient",
   (callback) => {
-    $.getJSON("../../assets/json/ingredients.json", (data) => {
-      for (let i = 0; i < data.length; i++) {
+    apiRequest("GET", "/api/menu", undefined, (data) => {
+      const ingredients = data.ingredients || [];
+      for (let i = 0; i < ingredients.length; i++) {
         $("#content").append(
           `<p class="iTR ${i == 0 ? "tE" : ""}" style="display: none;">${
-            data[i]
+            ingredients[i]
           }</p>`
         );
       }
       setTimeout(() => {
+        $("#content *").fadeIn();
         callback();
       }, 250);
     });
   },
   () => {
     $("#content p").click((e) => {
-      removeElement(e.target.innerHTML, "assets/json/ingredients.json");
+      removeElement(e.target.innerHTML, "ingredient");
       e.target.remove();
     });
   }

@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pizza-node",
+  "main": "worker/index.js",
+  "compatibility_date": "2025-08-13",
+  "observability": { "enabled": true },
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/api/*"]
+  },
+  "routes": [{ "pattern": "pizza.ennio.vip", "custom_domain": true }],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pizza",
+      "database_id": "a8a8955f-1220-477f-9cdb-4f3e83ad8d8b",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "ADMIN_PASSWORD": "master"
+  }
+}

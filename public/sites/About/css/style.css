@@ -60,7 +60,7 @@ h1 {
 
 body {
   background: linear-gradient(rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0.75)),
-    url("../assets/pictures/pizza-background.jpg");
+    url("../../../assets/pictures/pizza-background.jpg");
   background-position: center center;
   background-repeat: no-repeat;
   background-attachment: fixed;

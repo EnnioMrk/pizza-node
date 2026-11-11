@@ -5,43 +5,55 @@ var orders = [];
 var currentPizza = 0;
 var sessionOpt = 0;
 
-function writeToFile(path, input) {
-  console.log(path + " " + input);
+var adminKey = "";
+var ordersTimer = null;
+
+// All writes go to the Worker now. The old code posted a path and a body to
+// wtf.php, which wrote any file on the server.
+function apiRequest(method, url, data, done, fail) {
   $.ajax({
-    url: "../../api/wtf",
-    data: {
-      input: JSON.stringify(input),
-      path: path,
+    url: url,
+    method: method,
+    dataType: "json",
+    contentType: "application/json",
+    data: data === undefined ? undefined : JSON.stringify(data),
+    headers: { "x-admin-key": adminKey },
+    success: function (response) {
+      if (done) done(response);
     },
-    type: "post",
+    error: function (xhr) {
+      if (xhr.status === 401) {
+        adminKey = "";
+        pageHandler.loadPage("login");
+      }
+      if (fail) fail(xhr);
+    },
   });
 }
 
-function removeElement(Element, path) {
-  $.getJSON("../../" + path, (data) => {
-    data.splice(data.indexOf(Element), 1);
-    writeToFile(path, data);
-  });
+function addMenuItem(kind, name, done) {
+  apiRequest("POST", "/api/menu", { kind: kind, name: name }, done);
+}
+
+function removeElement(Element, kind) {
+  apiRequest("DELETE", "/api/menu", { kind: kind, name: Element });
 }
 
 function selectSessionIngredients() {
-  $.getJSON("../../assets/json/ingredients.json", (data) => {
-    console.log(data);
+  apiRequest("GET", "/api/menu", undefined, function (data) {
+    var ingredients = data.ingredients || [];
     $("#content").append(
-      `<p class="ingredient used tES" style="display: none;">${data[0]}</p>`
+      `<p class="ingredient used tES" style="display: none;">${ingredients[0]}</p>`
     );
-    for (let i = 1; i < data.length; i++) {
+    for (let i = 1; i < ingredients.length; i++) {
       $("#content").append(
-        `<p class="ingredient used" style="display: none;">${data[i]}</p>`
+        `<p class="ingredient used" style="display: none;">${ingredients[i]}</p>`
       );
     }
     $("#content").append(`<button id="next">Next</button>`);
     setTimeout(() => {
       $("#content *").fadeIn();
       $(".ingredient").click(function (e) {
-        //$("#nSI").append(getDomString(e.target));
-        //e.target.remove();
-        //$("#content *").off();
         $(this).toggleClass("used");
       });
       $("#next").click(function (e) {
@@ -59,10 +71,11 @@ function selectSessionIngredients() {
 
 function selectSessionO() {
   $("#content").empty();
-  $.getJSON("../../assets/json/options.json", (data) => {
-    for (let i = 0; i < data.length; i++) {
+  apiRequest("GET", "/api/menu", undefined, function (data) {
+    var options = data.options || [];
+    for (let i = 0; i < options.length; i++) {
       $("#content").append(
-        `<p class="option used" style="display: none;">${data[i]}</p>`
+        `<p class="option used" style="display: none;">${options[i]}</p>`
       );
     }
     $("#content").append(`<button id="next">Next</button>`);
@@ -72,8 +85,6 @@ function selectSessionO() {
         $(this).toggleClass("used");
       });
       $("#next").click(function (e) {
-        //^ maybe 2 because ingredient same button ^
-
         $("#content > p").each(function () {
           if (!$(this).hasClass("used")) {
             sessionO.push($(this).text());
@@ -89,54 +100,63 @@ function selectSessionO() {
 function showOrders(sendOpt) {
   $("#content").empty();
   $("#content").css("justify-content", "center");
-  -$("#content").load("./UI/orders.html", () => {
-    var options = {
-      I: sessionI,
-      O: sessionO,
-      time: Date.now(),
-    };
+  $("#content").load("./UI/orders.html", function () {
     if (sendOpt) {
-      var socket = io("https://myst-socket.glitch.me/", {
-        query: {
-          type: "admin",
-          opt: JSON.stringify(options),
-        },
-      });
+      apiRequest(
+        "POST",
+        "/api/session",
+        { ingredients: sessionI, options: sessionO },
+        function () {
+          startOrdersPolling();
+        }
+      );
     } else {
-      var socket = io("https://myst-socket.glitch.me/", {
-        query: {
-          type: "admin",
-        },
-      });
+      startOrdersPolling();
     }
+  });
+}
 
-    socket.on("pizzaOrders", (ordersArr) => {
-      orders = ordersArr;
-      loadOrder(orders[0]);
-      updateFooter();
-    });
+// Polling replaces the socket.io feed. One request every 3 s, and the Worker
+// answers 304 when nothing changed.
+function startOrdersPolling() {
+  if (ordersTimer) return;
+  pollOrders(true);
+  ordersTimer = setInterval(function () {
+    pollOrders(false);
+  }, 3000);
+}
 
-    socket.on("newPizza", (pizza) => {
-      console.log(pizza);
-      orders.push(pizza);
-      if (orders.length == 1) {
-        loadOrder(orders[0]);
+function stopOrdersPolling() {
+  if (ordersTimer) {
+    clearInterval(ordersTimer);
+    ordersTimer = null;
+  }
+}
+
+function pollOrders(reset) {
+  apiRequest("GET", "/api/orders", undefined, function (rows) {
+    if (reset) {
+      orders = [];
+      currentPizza = 0;
+    }
+    var changed = false;
+    (rows || []).forEach(function (row) {
+      var known = orders.some(function (o) {
+        return o.id === row.id;
+      });
+      if (!known) {
+        orders.push(row);
+        changed = true;
       }
-      updateFooter();
     });
+    if (!changed) return;
+    $("#iAO").empty();
+    if (orders.length) loadOrder(orders[currentPizza] || orders[0]);
+    updateFooter();
   });
 }
 
 function updateFooter() {
-  console.log(
-    `orders.length: ${
-      orders.length
-    }, currentpizza: ${currentPizza} \n orders: ${JSON.stringify(
-      orders,
-      null,
-      2
-    )}`
-  );
   var elemsToAdd = [];
   $("#footerWrapper").empty();
   if (orders.length > currentPizza + 1) {
@@ -170,6 +190,7 @@ function updateFooter() {
 }
 
 function loadOrder(pizza) {
+  if (!pizza) return;
   $("#tName").text(pizza.N);
   if (pizza.C != "") {
     $("#iAO").append(`
